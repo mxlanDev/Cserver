@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
 #include <netdb.h>
@@ -9,8 +10,10 @@
 #include <sys/sendfile.h>
 #include <fcntl.h>
 #include <string.h>
+#include <limits.h>
 
 void errHandle(int foo, char* msg);
+void recHandle(int sockCli); 
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -49,25 +52,50 @@ int main(int argc, char** argv) {
     addrSize = sizeof(SOCKIN);
     errHandle(sockCli = accept(sockCli,(SOCK *)&clientAddr,(socklen_t *)&addrSize),"Connection Failed.");
     printf("connected\n");
-
-    int valread = read(sockCli,buffer,256);
-    if(valread < 0){
-      printf("read fucked\n");
-      continue;
-    }
+    recHandle(sockCli);
     //SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
     //SSL* ssl = SSL_new(ctx);
     //SSL_set_fd(ssl,clientf_fd);
+  }
+  return 0;
+}
 
-    int valwrite = write(sockCli,resp,strlen(resp));
-    if(valwrite<0){
-      printf("write fuckup\n");
-      continue;
-    }
+void recHandle(int sockCli){
+  char buffer[BUFFER_SIZE];
+  size_t bytes;
+  int msgSize = 0;
+  char actualpath[PATH_MAX+1];
+
+  while((bytes = read(sockCli,buffer+msgSize,sizeof(buffer)-msgSize-1))>0){
+    msgSize += bytes;
+    if(msgSize>BUFFER_SIZE-1||buffer[msgSize-1]=='\n')break;
+  }
+  errHandle(bytes,"recv error");
+  buffer[msgSize-1]=0;
+  
+  printf("REQ: %s\n",buffer);
+  fflush(stdout);
+
+  if(realpath(buffer,actualpath)==NULL){
+    printf("Bad path: %s\n",buffer);
     close(sockCli);
+    return;
   }
 
-  return 0;
+  FILE *fp = fopen(actualpath,"r");
+  if(fp == NULL){
+    printf("Open error: %s \n",buffer);
+    close(sockCli);
+    return;
+  }
+
+  while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
+    printf("%zu bytes out", bytes);
+    write(sockCli,buffer,bytes);
+  }
+  close(sockCli);
+  fclose(fp);
+  printf("Closing con");
 }
 
 void errHandle(int foo, char* msg){
