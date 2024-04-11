@@ -8,55 +8,49 @@
 #include <unistd.h>
 #include <sys/sendfile.h>
 #include <fcntl.h>
+#include <string.h>
 
+void errHandle(int foo, char* msg);
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
 
-int main() {
+typedef struct sockaddr_in SOCKIN;
+typedef struct sockaddr SOCK;
+
+int main(int argc, char** argv) {
   char buffer[BUFFER_SIZE];
   char resp[] = "HTTP/1.0 200 OK\r\n"
   "Server: webserver-c\r\n"
   "Content-type: text/html\r\n\r\n"
   "<html>hello, world</html>\r\n";
   
+  int sockServ,sockCli,addrSize;
+  SOCKIN hostAddr, clientAddr;
 
-  int sockfd = socket(AF_INET, SOCK_STREAM,0);
-  if(sockfd == -1){
-    printf("socked fucked up\n");
-    return 1;
-  }
+  errHandle(sockServ = socket(AF_INET, SOCK_STREAM,0),"Socket creation failed.");
+
   printf("socket made\n");
-  struct sockaddr_in host_addr;
-  int host_addrlen = sizeof(host_addr);
-  
-  host_addr.sin_family = AF_INET;
-  host_addr.sin_port = htons(PORT);
-  host_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-  if(bind(sockfd,(struct sockaddr *)&host_addr,host_addrlen)!=0){
-    printf("webserver bind fucked\n");
-    return 0;
-  }
+  int hostAddrlen = sizeof(hostAddr);
+  
+  hostAddr.sin_family = AF_INET;
+  hostAddr.sin_port = htons(PORT);
+  hostAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+  errHandle(bind(sockServ,(SOCK *)&hostAddr,hostAddrlen),"Binding socket failed.");
   printf("bound\n");
 
-
-  if(listen(sockfd,SOMAXCONN)!=0){
-    printf("Listen Fuckup\n");
-    return 1;
-  }
+  errHandle(listen(sockServ,SOMAXCONN),"Priming listening failed.");
   printf("listening\n");
  
   while(1){
-
-    int client_fd = accept(sockfd,(struct sockaddr *)&host_addr,(socklen_t *)&host_addrlen);
-    if (client_fd < 0) {
-      printf("accept fucked\n");
-      continue;
-    }
+    printf("Waiting...");
+    addrSize = sizeof(SOCKIN);
+    errHandle(sockCli = accept(sockCli,(SOCK *)&clientAddr,(socklen_t *)&addrSize),"Connection Failed.");
     printf("connected\n");
 
-    int valread = read(client_fd,buffer,256);
+    int valread = read(sockCli,buffer,256);
     if(valread < 0){
       printf("read fucked\n");
       continue;
@@ -65,13 +59,17 @@ int main() {
     //SSL* ssl = SSL_new(ctx);
     //SSL_set_fd(ssl,clientf_fd);
 
-    int valwrite = write(client_fd,resp,strlen(resp));
+    int valwrite = write(sockCli,resp,strlen(resp));
     if(valwrite<0){
       printf("write fuckup\n");
       continue;
     }
-    close(client_fd);
+    close(sockCli);
   }
 
   return 0;
 }
+
+void errHandle(int foo, char* msg){
+  if(foo!=0)printf(msg);
+} 
