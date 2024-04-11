@@ -91,6 +91,9 @@ void recHandle(int sockCli){
 
   if(type == 0){
     if(path[1]==NULL)strcpy(path,"/index.html");//strncpy better, change later
+    
+
+    if(strchr(path,'.')==0)strcat(path,".html");
 
     if(realpath(&(path[1]),actualpath)==NULL){
       printf("Bad path: %s\n",path);
