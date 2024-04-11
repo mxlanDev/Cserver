@@ -15,23 +15,28 @@
 void errHandle(int foo, char* msg);
 void recHandle(int sockCli); 
 
+enum recType{
+  GET,
+  POST,
+  PUT,
+  PATCH,
+  DELETE,
+};
+
 #define PORT 8080
 #define BUFFER_SIZE 1024
+#define SOCKERROR -1
 
 typedef struct sockaddr_in SOCKIN;
 typedef struct sockaddr SOCK;
 
 int main(int argc, char** argv) {
-  char buffer[BUFFER_SIZE];
-  char resp[] = "HTTP/1.0 200 OK\r\n"
-  "Server: webserver-c\r\n"
-  "Content-type: text/html\r\n\r\n"
   "<html>hello, world</html>\r\n";
   
   int sockServ,sockCli,addrSize;
   SOCKIN hostAddr, clientAddr;
 
-  errHandle(sockServ = socket(AF_INET, SOCK_STREAM,0),"Socket creation failed.");
+  errHandle(sockServ = socket(AF_INET, SOCK_STREAM, 0),"Socket creation failed.");
 
   printf("socket made\n");
 
@@ -50,7 +55,7 @@ int main(int argc, char** argv) {
   while(1){
     printf("Waiting...");
     addrSize = sizeof(SOCKIN);
-    errHandle(sockCli = accept(sockCli,(SOCK *)&clientAddr,(socklen_t *)&addrSize),"Connection Failed.");
+    errHandle(sockCli = accept(sockServ,(SOCK *)&clientAddr,(socklen_t *)&addrSize),"Connection Failed.");
     printf("connected\n");
     recHandle(sockCli);
     //SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
@@ -76,28 +81,50 @@ void recHandle(int sockCli){
   printf("REQ: %s\n",buffer);
   fflush(stdout);
 
-  if(realpath(buffer,actualpath)==NULL){
-    printf("Bad path: %s\n",buffer);
-    close(sockCli);
-    return;
-  }
+  char path[BUFFER_SIZE]= {0};
+  char request[64];
+  sscanf(buffer,"%s %s",request,path);
+  
+  enum recType type;
 
-  FILE *fp = fopen(actualpath,"r");
-  if(fp == NULL){
-    printf("Open error: %s \n",buffer);
-    close(sockCli);
-    return;
-  }
+  if(strcmp(request,"GET"))type = GET;
 
-  while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
-    printf("%zu bytes out", bytes);
-    write(sockCli,buffer,bytes);
+  if(type == 0){
+    if(path[1]==NULL)strcpy(path,"/index.html");//strncpy better, change later
+
+    printf("%s",path);
+
+
+    if(realpath(&(path[1]),actualpath)==NULL){
+      printf("Bad path: %s\n",path);
+      close(sockCli);
+      return;
+    }
+
+    FILE *fp = fopen(actualpath,"r");
+    if(fp == NULL){
+      printf("Open error: %s \n",actualpath);
+      close(sockCli);
+      return;
+    }
+     
+    char resp[] = "HTTP/1.0 200 OK\r\n"
+    "Server: webserver-c\r\n"
+    "Content-type: text/html\r\n\r\n";
+
+    write(sockCli,resp,strlen(resp));
+
+    while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
+      printf("%zu bytes out", bytes);
+      write(sockCli,buffer,bytes);
+    }
+
+    fclose(fp);
   }
   close(sockCli);
-  fclose(fp);
   printf("Closing con");
 }
 
 void errHandle(int foo, char* msg){
-  if(foo!=0)printf(msg);
+  if(foo==SOCKERROR){printf(msg);exit(1);}
 } 
