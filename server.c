@@ -27,11 +27,11 @@ enum recType{
 #define BUFFER_SIZE 1024
 #define SOCKERROR -1
 
+
 typedef struct sockaddr_in SOCKIN;
 typedef struct sockaddr SOCK;
 
 int main(int argc, char** argv) {
-  "<html>hello, world</html>\r\n";
   
   int sockServ,sockCli,addrSize;
   SOCKIN hostAddr, clientAddr;
@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
   errHandle(bind(sockServ,(SOCK *)&hostAddr,hostAddrlen),"Binding socket failed.");
   printf("bound\n");
 
-  errHandle(listen(sockServ,SOMAXCONN),"Priming listening failed.");
+  errHandle(listen(sockServ,SOMAXCONN),"Priming listening failed.");// uses socket.h constant of 10, change if needed later
   printf("listening\n");
  
   while(1){

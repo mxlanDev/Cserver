@@ -4,7 +4,9 @@ A simple socket based web server written in c
 
 # TODO:
 
--Refractor for easier use<br>
+-Implement 404 redirect<br>
+-Implement more requests<br>
+-Implement more filetype returns<br>
 -Implement multithreading<br>
 -Implement LRU cache<br>
 -Handle thread locking<br>
