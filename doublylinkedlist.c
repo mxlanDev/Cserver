@@ -14,7 +14,7 @@ typedef struct{
 } DList;
 
 
-DList* init(){
+DList* dlistInit(){
   DList* list = (DList*)malloc(sizeof(DList));
   list->size = 0;
   list->head = NULL;
