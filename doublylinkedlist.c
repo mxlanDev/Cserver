@@ -1,17 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-
-typedef struct nodeT{
-  void* data;
-  struct nodeT* next;
-  struct nodeT* prev;
-} NodeT;
-
-typedef struct{
-  int size;
-  NodeT* head;
-  NodeT* tail;
-} DList;
+#include "doublylinkedlist.h"
 
 
 DList* dlistInit(){

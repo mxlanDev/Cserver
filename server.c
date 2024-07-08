@@ -90,7 +90,7 @@ void recHandle(int sockCli){
   if(strcmp(request,"GET"))type = GET;
 
   if(type == 0){
-    if(path[1]==NULL)strcpy(path,"/index.html");//strncpy better, change later
+    if(!path[1])strcpy(path,"/index.html");//strncpy better, change later
     
 
     if(strchr(path,'.')==0)strcat(path,".html");
