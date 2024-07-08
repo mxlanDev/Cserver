@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
@@ -126,5 +125,5 @@ void recHandle(int sockCli){
 }
 
 void errHandle(int foo, char* msg){
-  if(foo==SOCKERROR){printf(msg);exit(1);}
+  if(foo==SOCKERROR){printf("%s",msg);exit(1);}
 } 

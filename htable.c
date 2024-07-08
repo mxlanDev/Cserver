@@ -1,15 +1,4 @@
-#include "doublylinkedlist.c"
-typedef struct{
-  char* key;
-  int hash;
-  void* ptr;
-}HElement;
-
-typedef struct{
-  HElement* array;
-  int size;
-  DList* list;
-}HTable;
+#include "htable.h"
 
 HTable* htableInit(){
   HTable* table = (HTable*)malloc(sizeof(HTable));
