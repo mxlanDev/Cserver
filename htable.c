@@ -27,7 +27,7 @@ void* htableRemove(HTable* table, char* key, unsigned int (*hashFunction)(const 
   unsigned int location = (*hashFunction)(key)%(unsigned int)table->size;
   HElement element = table->array[location];
   if(table->array[location].ptr)
-    if(*key==element->key&&!strcmp(key,element.key)){//???
+    if(*key==*element.key&&!strcmp(key,element.key)){
       void* ptr = element.ptr;
       memset(table + location,0,sizeof(HElement));
       return ptr;
