@@ -11,8 +11,7 @@
 #include <string.h>
 #include <limits.h>
 
-void errHandle(int foo, char* msg);
-void recHandle(int sockCli); 
+#include "server.h"
 
 enum recType{
   GET,
@@ -34,6 +33,7 @@ int main(int argc, char** argv) {
   
   int sockServ,sockCli,addrSize;
   SOCKIN hostAddr, clientAddr;
+  Cache* serverCache = cacheInit();
 
   errHandle(sockServ = socket(AF_INET, SOCK_STREAM, 0),"Socket creation failed.");
 
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     addrSize = sizeof(SOCKIN);
     errHandle(sockCli = accept(sockServ,(SOCK *)&clientAddr,(socklen_t *)&addrSize),"Connection Failed.");
     printf("connected\n");
-    recHandle(sockCli);
+    recHandle(sockCli, serverCache);
     //SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
     //SSL* ssl = SSL_new(ctx);
     //SSL_set_fd(ssl,clientf_fd);
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-void recHandle(int sockCli){
+void recHandle(int sockCli, Cache* serverCache){
   char buffer[BUFFER_SIZE];
   size_t bytes;
   int msgSize = 0;
@@ -100,7 +100,7 @@ void recHandle(int sockCli){
       return;
     }
 
-    FILE *fp = fopen(actualpath,"r");
+    FILE *fp = cacheFile(serverCache,actualpath);
     if(fp == NULL){
       printf("Open error: %s \n",actualpath);
       close(sockCli);
