@@ -108,7 +108,7 @@ int dlistAdd(DList* list, int index, void* data){
 }
 
 
-int dlistPush(DList* list,void* data){
+NodeT* dlistPush(DList* list,void* data){
   NodeT* node = initNode(data);
   if(list->size == 0){
     list->tail = node;
@@ -119,7 +119,7 @@ int dlistPush(DList* list,void* data){
   }
   list->head = node;
   list->size++;
-  return 0;
+  return node;
 }
 
 int dlistPushTail(DList* list,void* data){

@@ -21,7 +21,7 @@ void* dlistGetLast(DList* list);
 void* dlistGet(DList* list,int index);
 void* dlistSet(DList* list, int index, void* value);
 int dlistAdd(DList* list, int index, void* data);
-int dlistPush(DList* list,void* data);
+NodeT* dlistPush(DList* list,void* data);
 int dlistPushTail(DList* list,void* data);
 void* dlistRemove(DList* list,int index);
 void* dlistPop(DList* list);
