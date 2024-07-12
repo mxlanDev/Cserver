@@ -101,6 +101,7 @@ void recHandle(int sockCli, Cache* serverCache){
     }
 
     FILE *fp = cacheFile(serverCache,actualpath);
+
     if(fp == NULL){
       printf("Open error: %s \n",actualpath);
       close(sockCli);
@@ -117,8 +118,7 @@ void recHandle(int sockCli, Cache* serverCache){
       printf("%zu bytes out", bytes);
       write(sockCli,buffer,bytes);
     }
-
-    fclose(fp);
+    fseek(fp,0,SEEK_SET);
   }
   close(sockCli);
   printf("Closing con");

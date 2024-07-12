@@ -5,13 +5,13 @@
 
 typedef struct{
   char* key;
-  int hash;
+  unsigned int* hash;
   void* ptr;
 }HElement;
 
 typedef struct{
-  HElement* array;
-  int size;
+  HElement** array;
+  unsigned int* size;
 }HTable;
 
 HTable* htableInit();

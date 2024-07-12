@@ -1,4 +1,5 @@
 #include "cache.h"
+#include <stdio.h>
 
 Cache* cacheInit(){
   Cache* cache = (Cache*)malloc(sizeof(Cache));
@@ -20,7 +21,8 @@ unsigned int cacheFnv(const char* path){
 
 FILE* cacheFile(Cache* cache, char* path){
   HElement* element = htableSearch(cache->table, path, cacheFnv);
-  if(element)return cacheMiss(cache,path);
+  if(!element)return cacheMiss(cache,path);
+  if(!(element->key==path))return cacheMiss(cache,path);
   return cacheHit(element,cache->list);
 }
 
@@ -45,21 +47,22 @@ FILE* cacheHit(HElement* element,DList* list){
     node->next = list->head;
   }
   list->head = node;
-  list->size++;
 
   return cell->fptr;
 }
 
 FILE* cacheMiss(Cache* cache, char* path){
   FILE* fptr = fopen(path,"r");
-  Cell* cell;
+  Cell* cell = malloc(sizeof(Cell));
   cell->path = path;
   cell->fptr = fptr;
   NodeT* node = dlistPush(cache->list,cell);
   htableAdd(cache->table,path,node,cacheFnv);
   if(cache->list->size>CACHE_MAX){
-    Cell* burn = dlistPop(cache->list);
+    Cell* burn = (Cell*)dlistPop(cache->list);
     htableRemove(cache->table,burn->path,cacheFnv);
+    fclose(burn->fptr);
+    free(burn);
   }
   return fptr;
 }
