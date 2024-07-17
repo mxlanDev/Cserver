@@ -1,39 +1,21 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <sys/sendfile.h>
-#include <fcntl.h>
-#include <string.h>
-#include <limits.h>
-
 #include "server.h"
 
-enum recType{
-  GET,
-  POST,
-  PUT,
-  PATCH,
-  DELETE,
-};
-
-#define PORT 8080
-#define BUFFER_SIZE 1024
-#define SOCKERROR -1
-
-
-typedef struct sockaddr_in SOCKIN;
-typedef struct sockaddr SOCK;
 
 int main(int argc, char** argv) {
-  
+  sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
+
   int sockServ,sockCli,addrSize;
   SOCKIN hostAddr, clientAddr;
   Cache* serverCache = cacheInit();
+  volatile DList* queue = dlistInit();
+  pthread_t threadPool[THREAD_MAX];
+  pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+  ThreadControl* control = malloc(sizeof(ThreadControl));
+  control->queue = queue;
+  control->mutex = &mutex;
+
+  for(int i = 0;i<THREAD_MAX;i++)pthread_create(&threadPool[i],NULL,threadLoop,control);
 
   errHandle(sockServ = socket(AF_INET, SOCK_STREAM, 0),"Socket creation failed.");
 
@@ -56,15 +38,38 @@ int main(int argc, char** argv) {
     addrSize = sizeof(SOCKIN);
     errHandle(sockCli = accept(sockServ,(SOCK *)&clientAddr,(socklen_t *)&addrSize),"Connection Failed.");
     printf("connected\n");
-    recHandle(sockCli, serverCache);
-    //SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
-    //SSL* ssl = SSL_new(ctx);
-    //SSL_set_fd(ssl,clientf_fd);
+    //recHandle(sockCli, serverCache);
+    //pthread_t thr;
+    ClientInfo* ci = malloc(sizeof(ClientInfo));
+    ci->sockCli = sockCli;
+    ci->serverCache = serverCache;
+    ci->mutex = &mutex;
+    pthread_mutex_lock(&mutex);
+    dlistPush(queue,ci);
+    pthread_mutex_unlock(&mutex);
+    //pthread_create(&thr,NULL,recHandle,ci);
   }
   return 0;
 }
 
-void recHandle(int sockCli, Cache* serverCache){
+void* threadLoop(void* args){
+  while(1){
+    ClientInfo* ci;
+    pthread_mutex_lock(((ThreadControl*)args)->mutex);
+    ci = dlistPop(((ThreadControl*)args)->queue);
+    pthread_mutex_unlock(((ThreadControl*)args)->mutex);
+    if(ci){
+      recHandle(ci);
+    }
+    sleep(1);
+  }
+}
+
+void* recHandle(void* ci){
+  int sockCli = ((ClientInfo*)ci)->sockCli;
+  volatile Cache* serverCache = ((ClientInfo*)ci)->serverCache;
+  pthread_mutex_t* mutex = ((ClientInfo*)ci)->mutex;
+  free(ci);//Maybe changed later idk
   char buffer[BUFFER_SIZE];
   size_t bytes;
   int msgSize = 0;
@@ -97,15 +102,17 @@ void recHandle(int sockCli, Cache* serverCache){
     if(realpath(&(path[1]),actualpath)==NULL){
       printf("Bad path: %s\n",path);
       close(sockCli);
-      return;
+      return NULL;
     }
 
+    pthread_mutex_lock(mutex);
     FILE *fp = cacheFile(serverCache,actualpath);
+    pthread_mutex_unlock(mutex);
 
     if(fp == NULL){
       printf("Open error: %s \n",actualpath);
       close(sockCli);
-      return;
+      return NULL;
     }
      
     char resp[] = "HTTP/1.0 200 OK\r\n"
@@ -122,6 +129,7 @@ void recHandle(int sockCli, Cache* serverCache){
   }
   close(sockCli);
   printf("Closing con");
+  return NULL;
 }
 
 void errHandle(int foo, char* msg){
