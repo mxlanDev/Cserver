@@ -1,21 +1,22 @@
 #include "server.h"
 
+pthread_t threadPool[THREAD_MAX];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+DList* queue;
 
 int main(int argc, char** argv) {
-  sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
-
+  //sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
+  queue = dlistInit();
   int sockServ,sockCli,addrSize;
   SOCKIN hostAddr, clientAddr;
   Cache* serverCache = cacheInit();
-  volatile DList* queue = dlistInit();
-  pthread_t threadPool[THREAD_MAX];
-  pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
   ThreadControl* control = malloc(sizeof(ThreadControl));
   control->queue = queue;
   control->mutex = &mutex;
 
-  for(int i = 0;i<THREAD_MAX;i++)pthread_create(&threadPool[i],NULL,threadLoop,control);
+  for(int i = 0;i<THREAD_MAX;i++)pthread_create(&threadPool[i],NULL,threadLoop,NULL);
 
   errHandle(sockServ = socket(AF_INET, SOCK_STREAM, 0),"Socket creation failed.");
 
@@ -43,9 +44,9 @@ int main(int argc, char** argv) {
     ClientInfo* ci = malloc(sizeof(ClientInfo));
     ci->sockCli = sockCli;
     ci->serverCache = serverCache;
-    ci->mutex = &mutex;
     pthread_mutex_lock(&mutex);
     dlistPush(queue,ci);
+    pthread_cond_signal(&cond);
     pthread_mutex_unlock(&mutex);
     //pthread_create(&thr,NULL,recHandle,ci);
   }
@@ -55,20 +56,23 @@ int main(int argc, char** argv) {
 void* threadLoop(void* args){
   while(1){
     ClientInfo* ci;
-    pthread_mutex_lock(((ThreadControl*)args)->mutex);
-    ci = dlistPop(((ThreadControl*)args)->queue);
-    pthread_mutex_unlock(((ThreadControl*)args)->mutex);
+    pthread_mutex_lock(&mutex);
+    if(!(ci = dlistPop(queue))){
+      pthread_cond_wait(&cond, &mutex);
+      ci = dlistPop(queue);
+    }
+
+    pthread_mutex_unlock(&mutex);
     if(ci){
       recHandle(ci);
     }
-    sleep(1);
   }
 }
 
 void* recHandle(void* ci){
+  pthread_mutex_t recMutex = PTHREAD_MUTEX_INITIALIZER;
   int sockCli = ((ClientInfo*)ci)->sockCli;
-  volatile Cache* serverCache = ((ClientInfo*)ci)->serverCache;
-  pthread_mutex_t* mutex = ((ClientInfo*)ci)->mutex;
+  Cache* serverCache = ((ClientInfo*)ci)->serverCache;
   free(ci);//Maybe changed later idk
   char buffer[BUFFER_SIZE];
   size_t bytes;
@@ -105,9 +109,10 @@ void* recHandle(void* ci){
       return NULL;
     }
 
-    pthread_mutex_lock(mutex);
+    pthread_mutex_lock(&mutex);
     FILE *fp = cacheFile(serverCache,actualpath);
-    pthread_mutex_unlock(mutex);
+    //FILE *fp = fopen(actualpath,"r"); 
+    pthread_mutex_unlock(&mutex);
 
     if(fp == NULL){
       printf("Open error: %s \n",actualpath);

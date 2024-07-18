@@ -18,7 +18,7 @@
 #define PORT 8080
 #define BUFFER_SIZE 1024
 #define SOCKERROR -1
-#define THREAD_MAX 2
+#define THREAD_MAX 7
 #define PATH_MAX 4096
 
 enum recType{
@@ -34,13 +34,12 @@ typedef struct sockaddr SOCK;
 
 typedef struct threadControl{
   pthread_mutex_t* mutex;
-  volatile DList* queue;
+  DList* queue;
 }ThreadControl;
 
 typedef struct clientInfo{
   int sockCli;
   Cache* serverCache;
-  pthread_mutex_t* mutex;
 }ClientInfo;
 
 
