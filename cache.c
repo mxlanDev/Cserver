@@ -1,5 +1,4 @@
 #include "cache.h"
-#include <stdio.h>
 
 Cache* cacheInit(){
   Cache* cache = (Cache*)malloc(sizeof(Cache));
@@ -22,7 +21,7 @@ unsigned int cacheFnv(const char* path){
 FILE* cacheFile(Cache* cache, char* path){
   HElement* element = htableSearch(cache->table, path, cacheFnv);
   if(!element)return cacheMiss(cache,path);
-  if(!(element->key==path))return cacheMiss(cache,path);
+  if(strcmp(element->key,path)!=0)return cacheMiss(cache,path);
   return cacheHit(element,cache->list);
 }
 
@@ -38,6 +37,8 @@ FILE* cacheHit(HElement* element,DList* list){
 
   if(node->next==NULL)list->tail = node->prev;
   else node->next->prev = node->prev;
+
+  list->size--;
   
   if(list->size == 0){
     list->tail = node;
@@ -47,6 +48,8 @@ FILE* cacheHit(HElement* element,DList* list){
     node->next = list->head;
   }
   list->head = node;
+
+  list->size++;
 
   return cell->fptr;
 }

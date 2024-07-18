@@ -1,6 +1,8 @@
 #include "htable.h"
 #include "doublylinkedlist.h"
 
+#include <string.h>
+
 #define FNV_OFFSET_BASE ((unsigned int)0x811c9dc5)
 #define FNV_PRIME ((unsigned int)0x01000193)
 

@@ -77,7 +77,7 @@ void* recHandle(void* ci){
   char buffer[BUFFER_SIZE];
   size_t bytes;
   int msgSize = 0;
-  char actualpath[PATH_MAX+1];
+  char* actualpath = malloc(PATH_MAX-1);
 
   while((bytes = read(sockCli,buffer+msgSize,sizeof(buffer)-msgSize-1))>0){
     msgSize += bytes;

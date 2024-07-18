@@ -45,10 +45,10 @@ void htableExtend(HTable* table,unsigned int (*hashFunction)(const char* key)){
   unsigned int newSize = (*table->size-1<<1)+1;
   HElement** new = (HElement**)calloc(newSize ,sizeof(HElement*));
   for(int i = 0;i<*table->size;i++){
-    if(!table->array[i]->ptr)continue;
+    if(!table->array[i])continue;
     unsigned int location = (*hashFunction)(table->array[i]->key)%newSize;
-    if(new[location]->ptr){
-      for(int i = 0;i<newSize;i++)if(!new[i])free(new[i]);
+    if(new[location]){
+      for(unsigned int i = 0;i<newSize;i++)if(!new[i])free(new[i]);
       free(new);
       newSize = (newSize-1<<1)+1;
       new = (HElement**)calloc(newSize ,sizeof(HElement*));
