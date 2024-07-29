@@ -14,6 +14,7 @@
 #include <signal.h>
 
 #include "cache.h"
+#include "http.h"
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
@@ -21,13 +22,6 @@
 #define THREAD_MAX 7
 #define PATH_MAX 4096
 
-enum recType{
-  GET,
-  POST,
-  PUT,
-  PATCH,
-  DELETE,
-};
 
 typedef struct sockaddr_in SOCKIN;
 typedef struct sockaddr SOCK;

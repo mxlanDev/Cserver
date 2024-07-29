@@ -93,7 +93,7 @@ void* recHandle(void* ci){
   char request[64];
   sscanf(buffer,"%s %s",request,path);
   
-  enum recType type;
+  enum httpMethod type;
 
   if(strcmp(request,"GET"))type = GET;
 
