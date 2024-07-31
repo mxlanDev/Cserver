@@ -1,4 +1,5 @@
 #include "http.h"
+#include <stdio.h>
 
 int stringToType(char* req){
   if(!strcmp(req,"GET"))return GET;
@@ -46,7 +47,7 @@ char* versionToString(enum httpVersion ver){
   return string;
 }
 //Ugly blob of switch
-char* codeToMessage(unsigned int code){
+char* codeToMessage(enum httpStatus code){
   switch(code){
     case 100: return "Continue";
     case 101: return "Switching Protocols";
@@ -93,23 +94,69 @@ char* codeToMessage(unsigned int code){
   }
 }
 
+char* statusToErrorPage(HttpReply* reply){
+  char* path = calloc(18,1);
+  sprintf(path,"errorPage%d.html",reply->httpStatus);
+  return path;
+}
 
+HttpRequest* requestInit(){
+  HttpRequest* request = calloc(1,sizeof(HttpRequest));
+  request->headers = malloc(1);
+  request->headerCount = 0;
+  return request;
+}
 
-HttpRequest* loadRequest(char* clientInput, int* errorCode){
-  HttpRequest* request;
+HttpReply* replyInit(){
+  HttpReply* reply = calloc(1,sizeof(HttpReply));
+  reply->headers = malloc(1);
+  reply->headerCount = 0;
+  reply->actualPath = calloc(PATH_MAX,1);
+  return reply;
+}
+
+void requestDelete(HttpRequest* request){
+  free(request->headers);
+  free(request);
+  return;
+}
+void replyDelete(HttpReply* reply){
+  free(reply->headers);
+  free(reply);
+  return;
+}
+
+HttpRequest* loadRequest(char* clientInput, enum httpStatus* errorCode){
+  HttpRequest* request = requestInit();
   char* doubleBreak;
   char* startingLine;
   char* headerLine;
   char* payload;
 
-  doubleBreak = strstr(clientInput,"\r\n\r\n");
-  startingLine = strtok(clientInput,"\r\n");
+  char* outerSaveptr = NULL;
+  printf("%d\n",*errorCode);
 
-  *errorCode = assignError(handleStartLine(request,startingLine), *errorCode);
+  char breakChars[4] = "\r\n\r\n";
 
-  headerLine = strtok(NULL,"\r\n");
-  while(headerLine||headerLine<startingLine){
-    *errorCode = assignError(handleHeader(request,headerLine), *errorCode);
+  int i = 0;
+  while(clientInput[i]!='\0'){printchar(clientInput[i]);i++;}
+  printf("Testert");
+
+
+  if(!(doubleBreak = strstr(clientInput,breakChars))){
+    *errorCode = Bad_Request;
+  }
+ 
+
+  startingLine = strtok_r(clientInput,"\r\n" , &outerSaveptr);
+  enum httpStatus tmp;
+  printf("%d\n",*errorCode);
+  *errorCode = assignErrorStatus(tmp=handleStartLine(request,startingLine), *errorCode);
+  printf("%d\n",*errorCode);
+  headerLine = strtok_r(NULL,"\r\n" , &outerSaveptr);
+  while(headerLine&&headerLine<doubleBreak){
+    *errorCode = assignErrorStatus(tmp=handleHeader(request,headerLine), *errorCode);
+    headerLine = strtok_r(NULL,"\r\n" , &outerSaveptr); 
   }
   
   payload = doubleBreak+4;
@@ -118,27 +165,135 @@ HttpRequest* loadRequest(char* clientInput, int* errorCode){
   return request;
 }
 
-HttpReply* formReply(HttpRequest request, int* errorCode){
-  //voodoo
+HttpReply* formReply(HttpRequest* request, enum httpStatus* errorCode){
+  HttpReply* reply = replyInit();
+  reply->version = HTTP_11;//hardcoded for now
+  addGeneralHeaders(reply);
+  if(*errorCode>=Bad_Request){
+  reply->httpStatus = *errorCode;
+  return reply;
+  }
+  switch(request->method){
+    case GET : processGet(reply,request);break;
+    case HEAD: processGet(reply, request);break;
+    case POST: reply->httpStatus = Not_Implemented;break;
+    case PUT: reply->httpStatus = Not_Implemented;break;
+    case PATCH: reply->httpStatus = Not_Implemented;break;
+    case DELETE: reply->httpStatus = Not_Implemented;break;
+    case CONNECT: reply->httpStatus = Not_Implemented;break;
+    case OPTIONS: reply->httpStatus = Not_Implemented;break;
+  }
+  return reply;
 }
 
-char* replyToString(HttpReply reply){
-    //strcat jumbo
+void processGet(HttpReply* reply, HttpRequest* request){
+  char uri[BUFFER_SIZE] = {0};
+  char* actualpath = malloc(PATH_MAX-1);
+
+  strcpy(uri,request->uri);
+  if(!uri[1])strcpy(uri,"/index.html");
+  if(!strchr(uri,'.'))strcat(uri,".html");
+  
+  if(realpath(&(uri[1]),actualpath)==NULL){
+    reply->httpStatus = Not_Found;
+    return;
+  }
+  reply->httpStatus = OK;
+  strcpy(reply->actualPath,&uri[1]);
+  return;
+  //Chech uri
+}
+
+void sendReplyHeaders(HttpReply* reply, int fd){
+  char* version = versionToString(reply->version);
+  write(fd, version, sizeof(version));
+  write(fd, " ", 1);
+  char statusCode[3];
+  sprintf(statusCode,"%d",reply->httpStatus);//change this if I form status code enums maybe
+  write(fd, statusCode, 3);
+  write(fd, " ", 1);
+  char* statusMessage = codeToMessage(reply->httpStatus);
+  write(fd, "\r\n", 2);
+  for(int i = 0;i<reply->headerCount;i++){
+    write(fd,reply->headers[i].key,sizeof(reply->headers[i].key));
+    write(fd,": ",2);
+    write(fd,reply->headers[i].value,sizeof(reply->headers[i].value));
+    write(fd,"\r\n",2);
+  }
+  write(fd, "\r\n", 2);
 }
 
 int handleStartLine(HttpRequest* request, char* startingLine){
-  //...
-  return NO_ERROR;
+  char* token;
+  char* saveptr = NULL;
+
+  enum httpStatus errorCode = OK;
+
+  token = strtok_r(startingLine, " ", &saveptr);
+  if(!(request->method = (enum httpMethod) stringToType(token))) assignErrorStatus(errorCode,Bad_Request);
+
+  token = strtok_r(NULL, " ", &saveptr);
+  if(!(request->uri = token)) assignErrorStatus(errorCode,Bad_Request);
+  
+  token = strtok_r(NULL, " ", &saveptr);
+  if(!(request->version= (enum httpVersion) stringToVersion(token))) assignErrorStatus(errorCode,Bad_Request);
+  if(request->version== HTTP_20)assignErrorStatus(errorCode, HTTP_Version_Not_Supported);
+  
+  if((token=strtok_r(NULL, " ", &saveptr)))assignErrorStatus(errorCode, Bad_Request);
+  return errorCode;
 }
 
-int handleHeader(HttpRequest* request, char* startHeader){
-  //...
-  return NO_ERROR;
+enum httpStatus handleHeader(HttpRequest* request, char* startHeader){
+  char* token;
+  char* saveptr = NULL;
+
+  enum httpStatus errorCode = OK;
+
+  char* colonLocation = index(startHeader,':');
+  *colonLocation = '\0';
+
+  char* key = startHeader;
+  char* value = colonLocation+1;
+  errorCode = assignErrorStatus(addRequestHeader(request,key,value),errorCode);
+  return errorCode;
 }
 
-
-int assignError(int ret, int error){
-  if(ret>error)return ret;
-  return error;
+int addRequestHeader(HttpRequest* request, char* key, char* value){
+  request->headerCount++;
+  HttpHeader* tmp =  realloc(request->headers, request->headerCount*sizeof(HttpHeader));
+  if(!tmp){
+    request->headerCount--;
+    return Internal_Server_Error;
+  }
+  request->headers = tmp;
+  request->headers[request->headerCount-1].key = key; 
+  request->headers[request->headerCount-1].value = value;
+  return OK;
 }
+
+int addReplyHeader(HttpReply* reply, char* key, char* value){
+  reply->headerCount++;
+  HttpHeader* tmp = realloc(reply->headers, reply->headerCount*sizeof(HttpHeader));
+  if(!tmp){
+    reply->headerCount--;
+    return Internal_Server_Error;
+  }
+  reply->headers = tmp;
+  reply->headers[reply->headerCount-1].key = key; 
+  reply->headers[reply->headerCount-1].value = value;
+  return OK;
+}
+
+void addGeneralHeaders(HttpReply* reply){
+  addReplyHeader(reply,"Server","cserver");
+  addReplyHeader(reply,"Content-type","text/html");
+}
+
+enum httpStatus assignErrorStatus(enum httpStatus ret, enum httpStatus error){
+  if(ret == 500)return ret;
+  if(error>= 400) return error;
+  return ret;
+}
+
+//Neki request code to path sranje, onda mutex citanje patha i taj kurac
 

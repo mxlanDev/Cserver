@@ -38,6 +38,9 @@ typedef struct clientInfo{
 
 
 
-void* recHandle(void* ci);
+void* recHandle(Cache* cache, int sockCli);
+void* recHandle2(Cache* cache, int sockCli);
 void errHandle(int foo, char* msg);
 void* threadLoop(void* args);
+void printchar(unsigned char theChar);
+void printstring(char* string);

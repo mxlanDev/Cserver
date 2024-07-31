@@ -10,7 +10,6 @@ int main(int argc, char** argv) {
   queue = dlistInit();
   int sockServ,sockCli,addrSize;
   SOCKIN hostAddr, clientAddr;
-  Cache* serverCache = cacheInit();
 
   ThreadControl* control = malloc(sizeof(ThreadControl));
   control->queue = queue;
@@ -41,11 +40,9 @@ int main(int argc, char** argv) {
     printf("connected\n");
     //recHandle(sockCli, serverCache);
     //pthread_t thr;
-    ClientInfo* ci = malloc(sizeof(ClientInfo));
-    ci->sockCli = sockCli;
-    ci->serverCache = serverCache;
+
     pthread_mutex_lock(&mutex);
-    dlistPush(queue,ci);
+    dlistPush(queue,&sockCli);
     pthread_cond_signal(&cond);
     pthread_mutex_unlock(&mutex);
     //pthread_create(&thr,NULL,recHandle,ci);
@@ -54,84 +51,63 @@ int main(int argc, char** argv) {
 }
 
 void* threadLoop(void* args){
+  Cache* threadCache = cacheInit(); 
   while(1){
-    ClientInfo* ci;
+    int* sockCli;
     pthread_mutex_lock(&mutex);
-    if(!(ci = dlistPop(queue))){
+    if(!(sockCli = (int*)dlistPop(queue))){
       pthread_cond_wait(&cond, &mutex);
-      ci = dlistPop(queue);
+      sockCli = (int*)dlistPop(queue);
     }
 
     pthread_mutex_unlock(&mutex);
-    if(ci){
-      recHandle(ci);
+    if(sockCli){
+      recHandle(threadCache, *sockCli);
     }
   }
 }
 
-void* recHandle(void* ci){
-  pthread_mutex_t recMutex = PTHREAD_MUTEX_INITIALIZER;
-  int sockCli = ((ClientInfo*)ci)->sockCli;
-  Cache* serverCache = ((ClientInfo*)ci)->serverCache;
-  free(ci);//Maybe changed later idk
+void* recHandle(Cache* cache, int sockCli){
   char buffer[BUFFER_SIZE];
   size_t bytes;
   int msgSize = 0;
-  char* actualpath = malloc(PATH_MAX-1);
 
   while((bytes = read(sockCli,buffer+msgSize,sizeof(buffer)-msgSize-1))>0){
     msgSize += bytes;
     if(msgSize>BUFFER_SIZE-1||buffer[msgSize-1]=='\n')break;
   }
-  errHandle(bytes,"recv error");
-  buffer[msgSize-1]=0;
-  
-  printf("REQ: %s\n",buffer);
-  fflush(stdout);
 
-  char path[BUFFER_SIZE]= {0};
-  char request[64];
-  sscanf(buffer,"%s %s",request,path);
-  
-  enum httpMethod type;
+  buffer[msgSize]=0;
 
-  if(strcmp(request,"GET"))type = GET;
+  enum httpStatus errorCode = OK;
+  HttpRequest* request = loadRequest(buffer,&errorCode);
+  //printf("%d\n",errorCode);
+  HttpReply* reply = formReply(request,&errorCode);
+  //printf("%d\n",reply->httpStatus);
+  sendReplyHeaders(reply,sockCli);
 
-  if(type == 0){
-    if(!path[1])strcpy(path,"/index.html");//strncpy better, change later
-    
+  FILE *fp;
+  char* errorPage = statusToErrorPage(reply);
+  //printf("%d\n",reply->httpStatus);
+  if(reply->httpStatus>=400)fp = cacheFile(cache,errorPage);
+  else fp = cacheFile(cache,reply->actualPath);
+  //FILE *fp = fopen(actualpath,"r"); 
 
-    if(strchr(path,'.')==0)strcat(path,".html");
-
-    if(realpath(&(path[1]),actualpath)==NULL){
-      printf("Bad path: %s\n",path);
-      close(sockCli);
-      return NULL;
-    }
-
-    pthread_mutex_lock(&mutex);
-    FILE *fp = cacheFile(serverCache,actualpath);
-    //FILE *fp = fopen(actualpath,"r"); 
-    pthread_mutex_unlock(&mutex);
-
-    if(fp == NULL){
-      printf("Open error: %s \n",actualpath);
-      close(sockCli);
-      return NULL;
-    }
-     
-    char resp[] = "HTTP/1.0 200 OK\r\n"
-    "Server: webserver-c\r\n"
-    "Content-type: text/html\r\n\r\n";
-
-    write(sockCli,resp,strlen(resp));
-
-    while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
-      printf("%zu bytes out", bytes);
-      write(sockCli,buffer,bytes);
-    }
-    fseek(fp,0,SEEK_SET);
+  if(fp == NULL){
+    printf("Open error: %s \n",reply->actualPath);
+    close(sockCli);
+    return NULL;
   }
+
+  while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
+    printf("%zu bytes out", bytes);
+    write(sockCli,buffer,bytes);
+   }
+   fseek(fp,0,SEEK_SET);
+  
+  requestDelete(request);
+  replyDelete(reply);
+
   close(sockCli);
   printf("Closing con");
   return NULL;
@@ -139,4 +115,33 @@ void* recHandle(void* ci){
 
 void errHandle(int foo, char* msg){
   if(foo==SOCKERROR){printf("%s",msg);exit(1);}
-} 
+}
+
+
+void printString(char* string){
+  int i = 0;
+  while(string[i]!='\0'){printchar(string[i]);i++;}
+}
+
+void printchar(unsigned char theChar) {
+
+    switch (theChar) {
+
+        case '\n':
+            printf("\\n\n");
+            break;
+        case '\r':
+            printf("\\r");
+            break;
+        case '\t':
+            printf("\\t");
+            break;
+        default:
+            if ((theChar < 0x20) || (theChar > 0x7f)) {
+                printf("\\%03o", (unsigned char)theChar);
+            } else {
+                printf("%c", theChar);
+            }
+        break;
+   }
+}
