@@ -1,0 +1,27 @@
+[
+  {
+    "directory": "/home/mx/cProg/testert/Cserver",
+    "file": "src/http.c",
+    "command": "gcc -c -o src/obj/http.o src/http.c -Iinclude"
+  },
+  {
+    "directory": "/home/mx/cProg/testert/Cserver",
+    "file": "src/doublylinkedlist.c",
+    "command": "gcc -c -o src/obj/doublylinkedlist.o src/doublylinkedlist.c -Iinclude"
+  },
+  {
+    "directory": "/home/mx/cProg/testert/Cserver",
+    "file": "src/htable.c",
+    "command": "gcc -c -o src/obj/htable.o src/htable.c -Iinclude"
+  },
+  {
+    "directory": "/home/mx/cProg/testert/Cserver",
+    "file": "src/cache.c",
+    "command": "gcc -c -o src/obj/cache.o src/cache.c -Iinclude"
+  },
+  {
+    "directory": "/home/mx/cProg/testert/Cserver",
+    "file": "src/server.c",
+    "command": "gcc -c -o src/obj/server.o src/server.c -Iinclude"
+  }
+]

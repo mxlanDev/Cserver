@@ -56,3 +56,6 @@ dkms.conf
 
 #Build dir
 build 
+
+#Cache dir
+.cache
