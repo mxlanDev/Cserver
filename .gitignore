@@ -55,4 +55,4 @@ dkms.conf
 *.html
 
 #Build dir
-Build 
+build 
