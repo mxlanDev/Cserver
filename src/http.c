@@ -121,7 +121,12 @@ void requestDelete(HttpRequest* request){
   return;
 }
 void replyDelete(HttpReply* reply){
+  for(int i = 0;i<reply->headerCount;i++){
+    free(reply->headers[i].key);
+    free(reply->headers[i].value);
+  }
   free(reply->headers);
+  free(reply->actualPath);
   free(reply);
   return;
 }
@@ -134,14 +139,7 @@ HttpRequest* loadRequest(char* clientInput, enum httpStatus* errorCode){
   char* payload;
 
   char* outerSaveptr = NULL;
-  printf("%d\n",*errorCode);
-
   char breakChars[4] = "\r\n\r\n";
-
-  int i = 0;
-  while(clientInput[i]!='\0'){printchar(clientInput[i]);i++;}
-  printf("Testert");
-
 
   if(!(doubleBreak = strstr(clientInput,breakChars))){
     *errorCode = Bad_Request;
@@ -150,9 +148,7 @@ HttpRequest* loadRequest(char* clientInput, enum httpStatus* errorCode){
 
   startingLine = strtok_r(clientInput,"\r\n" , &outerSaveptr);
   enum httpStatus tmp;
-  printf("%d\n",*errorCode);
   *errorCode = assignErrorStatus(tmp=handleStartLine(request,startingLine), *errorCode);
-  printf("%d\n",*errorCode);
   headerLine = strtok_r(NULL,"\r\n" , &outerSaveptr);
   while(headerLine&&headerLine<doubleBreak){
     *errorCode = assignErrorStatus(tmp=handleHeader(request,headerLine), *errorCode);
@@ -188,18 +184,19 @@ HttpReply* formReply(HttpRequest* request, enum httpStatus* errorCode){
 
 void processGet(HttpReply* reply, HttpRequest* request){
   char uri[BUFFER_SIZE] = {0};
-  char* actualpath = malloc(PATH_MAX-1);
+  char* actualPath;
 
   strcpy(uri,request->uri);
   if(!uri[1])strcpy(uri,"/index.html");
   if(!strchr(uri,'.'))strcat(uri,".html");
   
-  if(realpath(&(uri[1]),actualpath)==NULL){
+  if(!(actualPath = realpath(&(uri[1]),NULL))){
     reply->httpStatus = Not_Found;
     return;
   }
   reply->httpStatus = OK;
-  strcpy(reply->actualPath,&uri[1]);
+  strcpy(reply->actualPath,actualPath);
+  free(actualPath);
   return;
   //Chech uri
 }
@@ -215,9 +212,9 @@ void sendReplyHeaders(HttpReply* reply, int fd){
   char* statusMessage = codeToMessage(reply->httpStatus);
   write(fd, "\r\n", 2);
   for(int i = 0;i<reply->headerCount;i++){
-    write(fd,reply->headers[i].key,sizeof(reply->headers[i].key));
+    write(fd,reply->headers[i].key,strlen(reply->headers[i].key));
     write(fd,": ",2);
-    write(fd,reply->headers[i].value,sizeof(reply->headers[i].value));
+    write(fd,reply->headers[i].value,strlen(reply->headers[i].value));
     write(fd,"\r\n",2);
   }
   write(fd, "\r\n", 2);
@@ -279,15 +276,26 @@ int addReplyHeader(HttpReply* reply, char* key, char* value){
     return Internal_Server_Error;
   }
   reply->headers = tmp;
-  reply->headers[reply->headerCount-1].key = key; 
-  reply->headers[reply->headerCount-1].value = value;
+  char* headerKey = malloc(strlen(key)+1);
+  char* headerValue = malloc(strlen(value)+1);
+  sprintf(headerKey,"%s",key);
+  sprintf(headerValue,"%s",value);
+  headerKey[strlen(key)] = '\0';
+  headerValue[strlen(value)] = '\0';
+  reply->headers[reply->headerCount-1].key = headerKey; 
+  reply->headers[reply->headerCount-1].value = headerValue;
   return OK;
 }
 
 void addGeneralHeaders(HttpReply* reply){
   addReplyHeader(reply,"Server","cserver");
   addReplyHeader(reply,"Content-type","text/html");
+  addReplyHeader(reply,"Connection","Keep-Alive");
 }
+
+//void addEntityHeaders(HttpReply* reply,int contentLength){
+//  
+//}
 
 enum httpStatus assignErrorStatus(enum httpStatus ret, enum httpStatus error){
   if(ret == 500)return ret;

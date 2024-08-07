@@ -1,7 +1,7 @@
 IDIR = include
 SDIR = src
 CC=gcc
-CFLAGS=-I$(IDIR)
+CFLAGS=-g -I$(IDIR)
 
 DIRS=build
 $(info $(shell mkdir -p $(DIRS)))

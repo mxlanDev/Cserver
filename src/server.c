@@ -1,23 +1,23 @@
 #include "server.h"
+#include <unistd.h>
 
 pthread_t threadPool[THREAD_MAX];
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-DList* queue;
+//pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+//pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+//DList* queue;
 
 int main(int argc, char** argv) {
   //sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
-  queue = dlistInit();
+  //queue = dlistInit();
   int sockServ,sockCli,addrSize;
   SOCKIN hostAddr, clientAddr;
 
-  ThreadControl* control = malloc(sizeof(ThreadControl));
-  control->queue = queue;
-  control->mutex = &mutex;
-
-  for(int i = 0;i<THREAD_MAX;i++)pthread_create(&threadPool[i],NULL,threadLoop,NULL);
-
   errHandle(sockServ = socket(AF_INET, SOCK_STREAM, 0),"Socket creation failed.");
+
+  int opt = 1;
+  if(setsockopt(sockServ,SOL_SOCKET,SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))<0){
+    printf("Reuseaddr not set");
+  }
 
   printf("socket made\n");
 
@@ -32,25 +32,36 @@ int main(int argc, char** argv) {
 
   errHandle(listen(sockServ,SOMAXCONN),"Priming listening failed.");// uses socket.h constant of 10, change if needed later
   printf("listening\n");
- 
-  while(1){
-    printf("Waiting...");
-    addrSize = sizeof(SOCKIN);
-    errHandle(sockCli = accept(sockServ,(SOCK *)&clientAddr,(socklen_t *)&addrSize),"Connection Failed.");
-    printf("connected\n");
-    //recHandle(sockCli, serverCache);
-    //pthread_t thr;
+  
+  int epfdArr[THREAD_MAX] = {0};
 
-    pthread_mutex_lock(&mutex);
-    dlistPush(queue,&sockCli);
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&mutex);
-    //pthread_create(&thr,NULL,recHandle,ci);
+  for(int i = 0;i<THREAD_MAX;i++){
+    int epfd = epoll_create1(0);
+    epfdArr[i]=epfd; 
+    pthread_create(&threadPool[i],NULL,threadLoop,&epfdArr[i]);
+  }
+
+  struct epoll_event event;
+  int currentWorker = 0;
+  
+  while(1){
+    //printf("Waiting...");
+    addrSize = sizeof(SOCKIN);
+    errHandle(sockCli = accept4(sockServ,(SOCK *)&clientAddr,(socklen_t *)&addrSize,SOCK_NONBLOCK),"Connection Failed.");
+    int optval = 1;
+    int keepAlive = setsockopt(sockCli, SOL_SOCKET, SO_KEEPALIVE, &optval,sizeof(optval));
+    //printf("connected\n");
+    event.events = EPOLLIN;
+    event.data.fd = sockCli;
+
+    epoll_ctl(epfdArr[currentWorker], EPOLL_CTL_ADD, sockCli, &event);
+    currentWorker++;
+    if(currentWorker==THREAD_MAX)currentWorker=0; 
   }
   return 0;
 }
-
-void* threadLoop(void* args){
+/*
+void* threadLoop2(void* args){
   Cache* threadCache = cacheInit(); 
   while(1){
     int* sockCli;
@@ -66,50 +77,81 @@ void* threadLoop(void* args){
     }
   }
 }
+*/
 
-void* recHandle(Cache* cache, int sockCli){
-  char buffer[BUFFER_SIZE];
-  size_t bytes;
-  int msgSize = 0;
+void* threadLoop(void* args){
+  Cache* threadCache = cacheInit();
+  int threadEpfd = *(int*)args;
+  return recHandle(threadCache,threadEpfd);
+}
 
-  while((bytes = read(sockCli,buffer+msgSize,sizeof(buffer)-msgSize-1))>0){
-    msgSize += bytes;
-    if(msgSize>BUFFER_SIZE-1||buffer[msgSize-1]=='\n')break;
+void* recHandle(Cache* cache, int threadEpfd){
+  while(1){
+    struct epoll_event polledEvents[EVENTS_MAX];
+    int numReads = epoll_wait(threadEpfd, polledEvents, EVENTS_MAX, -1);
+    for(int i = 0;i < numReads;i++){
+      
+      char buffer[BUFFER_SIZE];
+      size_t bytes;
+      int msgSize = 0;
+      int sockCli = polledEvents[i].data.fd;
+
+      while((bytes = read(sockCli,buffer+msgSize,sizeof(buffer)-msgSize-1))>0){
+        msgSize += bytes;
+        if(msgSize>BUFFER_SIZE-1||buffer[msgSize-1]=='\n')break;
+      }
+
+      if(msgSize==0){
+        close(polledEvents[i].data.fd);
+        continue;
+      }
+       printf("PULSE\n");
+
+      buffer[msgSize]=0;
+
+      printf("%s",buffer);
+
+      FILE *fp;
+
+      enum httpStatus errorCode = OK;
+      HttpRequest* request = loadRequest(buffer,&errorCode);
+      HttpReply* reply = formReply(request,&errorCode);
+      
+      char* errorPage = statusToErrorPage(reply);
+      if(reply->httpStatus>=400)fp = cacheFile(cache,errorPage);
+      else fp = cacheFile(cache,reply->actualPath);
+      free(errorPage);
+      
+      if(fp == NULL){
+        printf("Open error: %s \n",reply->actualPath);
+        reply->httpStatus = 500;
+        return NULL;
+      }
+      fseek(fp,0,SEEK_END);
+      int size = ftell(fp);
+      char lengthBuffer[1024];
+      sprintf(lengthBuffer,"%d",size);
+      addReplyHeader(reply,"Content-Length",lengthBuffer);
+      printf("%s\n",lengthBuffer);
+
+      sendReplyHeaders(reply,sockCli);
+
+     
+      fseek(fp,0,SEEK_SET);
+      while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
+        printf("%zu bytes out\n", bytes);
+        write(STDOUT_FILENO,buffer,bytes);
+        write(sockCli,buffer,bytes);
+       }
+      
+      
+      requestDelete(request);
+      replyDelete(reply);
+
+      //close(polledEvents[i].data.fd);
+      //printf("Closing con");
+    }
   }
-
-  buffer[msgSize]=0;
-
-  enum httpStatus errorCode = OK;
-  HttpRequest* request = loadRequest(buffer,&errorCode);
-  //printf("%d\n",errorCode);
-  HttpReply* reply = formReply(request,&errorCode);
-  //printf("%d\n",reply->httpStatus);
-  sendReplyHeaders(reply,sockCli);
-
-  FILE *fp;
-  char* errorPage = statusToErrorPage(reply);
-  //printf("%d\n",reply->httpStatus);
-  if(reply->httpStatus>=400)fp = cacheFile(cache,errorPage);
-  else fp = cacheFile(cache,reply->actualPath);
-  //FILE *fp = fopen(actualpath,"r"); 
-
-  if(fp == NULL){
-    printf("Open error: %s \n",reply->actualPath);
-    close(sockCli);
-    return NULL;
-  }
-
-  while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
-    printf("%zu bytes out", bytes);
-    write(sockCli,buffer,bytes);
-   }
-   fseek(fp,0,SEEK_SET);
-  
-  requestDelete(request);
-  replyDelete(reply);
-
-  close(sockCli);
-  printf("Closing con");
   return NULL;
 }
 

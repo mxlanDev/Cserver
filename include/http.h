@@ -117,6 +117,7 @@ enum httpStatus handleHeader(HttpRequest* request, char* headerLine);
 int handlePayload(HttpRequest* request, char* payloadLine);
 
 void addGeneralHeaders(HttpReply* reply);
+void addEntityHeaders(HttpReply* reply,FILE* fptr);
 void processGet(HttpReply* reply, HttpRequest* request);
 void processHead(HttpReply* reply, HttpRequest* request);
 
