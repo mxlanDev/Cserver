@@ -303,5 +303,4 @@ enum httpStatus assignErrorStatus(enum httpStatus ret, enum httpStatus error){
   return ret;
 }
 
-//Neki request code to path sranje, onda mutex citanje patha i taj kurac
 

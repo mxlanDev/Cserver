@@ -56,7 +56,8 @@ int main(int argc, char** argv) {
 
     epoll_ctl(epfdArr[currentWorker], EPOLL_CTL_ADD, sockCli, &event);
     currentWorker++;
-    if(currentWorker==THREAD_MAX)currentWorker=0; 
+    if(currentWorker==THREAD_MAX)currentWorker=0;
+    printf("New Connection!\n");
   }
   return 0;
 }
@@ -103,9 +104,10 @@ void* recHandle(Cache* cache, int threadEpfd){
 
       if(msgSize==0){
         close(polledEvents[i].data.fd);
+        printf("Connection closed!");
         continue;
       }
-       printf("PULSE\n");
+      //printf("PULSE\n");
 
       buffer[msgSize]=0;
 
@@ -118,9 +120,12 @@ void* recHandle(Cache* cache, int threadEpfd){
       HttpReply* reply = formReply(request,&errorCode);
       
       char* errorPage = statusToErrorPage(reply);
-      if(reply->httpStatus>=400)fp = cacheFile(cache,errorPage);
-      else fp = cacheFile(cache,reply->actualPath);
+      //if(reply->httpStatus>=400)fp = cacheFile(cache,errorPage);
+      //else fp = cacheFile(cache,reply->actualPath);
+      if(reply->httpStatus>=400)fp = fopen(errorPage,"r");
+      else fp = fopen(reply->actualPath,"r");
       free(errorPage);
+      errorPage = NULL;
       
       if(fp == NULL){
         printf("Open error: %s \n",reply->actualPath);
@@ -132,15 +137,15 @@ void* recHandle(Cache* cache, int threadEpfd){
       char lengthBuffer[1024];
       sprintf(lengthBuffer,"%d",size);
       addReplyHeader(reply,"Content-Length",lengthBuffer);
-      printf("%s\n",lengthBuffer);
+      //printf("%s\n",lengthBuffer);
 
       sendReplyHeaders(reply,sockCli);
 
      
       fseek(fp,0,SEEK_SET);
       while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
-        printf("%zu bytes out\n", bytes);
-        write(STDOUT_FILENO,buffer,bytes);
+        //printf("%zu bytes out\n", bytes);
+        //write(STDOUT_FILENO,buffer,bytes);
         write(sockCli,buffer,bytes);
        }
       
