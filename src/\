@@ -120,8 +120,10 @@ void* recHandle(Cache* cache, int threadEpfd){
       HttpReply* reply = formReply(request,&errorCode);
       
       char* errorPage = statusToErrorPage(reply);
-      if(reply->httpStatus>=400)fp = cacheFile(cache,errorPage);
-      else fp = cacheFile(cache,reply->actualPath);
+      //if(reply->httpStatus>=400)fp = cacheFile(cache,errorPage);
+      //else fp = cacheFile(cache,reply->actualPath);
+      if(reply->httpStatus>=400)fp = fopen(errorPage,"r");
+      else fp = fopen(reply->actualPath,"r");
       free(errorPage);
       errorPage = NULL;
       

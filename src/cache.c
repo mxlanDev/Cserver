@@ -59,11 +59,11 @@ FILE* cacheMiss(Cache* cache, char* path){
   FILE* fptr = fopen(path,"r");
   Cell* cell = malloc(sizeof(Cell));
   cell->path = calloc(strlen(path)+1,1);
-  strcat(cell->path,path);
+  strcpy(cell->path,path);
   cell->fptr = fptr;
   NodeT* node = dlistPush(cache->list,cell);
-  printf("Added %s to cache!\n",cell->path);
-  htableAdd(cache->table,path,node,cacheFnv);
+  //printf("Added %s to cache!\n",cell->path);
+  htableAdd(cache->table,cell->path,node,cacheFnv);
   if(cache->list->size>CACHE_MAX){
     Cell* burn = (Cell*)dlistPop(cache->list);
     htableRemove(cache->table,burn->path,cacheFnv);
