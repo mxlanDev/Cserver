@@ -132,13 +132,16 @@ void* recHandle(Cache* cache, int threadEpfd){
       }
       fseek(fp,0,SEEK_END);
       int size = ftell(fp);
-      char lengthBuffer[1024];
-      sprintf(lengthBuffer,"%d",size);
-      addReplyHeader(reply,"Content-Length",lengthBuffer);
+      //char lengthBuffer[1024];
+      //sprintf(lengthBuffer,"%d",size);
+      //addReplyHeader(reply,"Content-Length",lengthBuffer);
       //printf("%s\n",lengthBuffer);
+      
+      addEntityHeaders(reply,size);
 
       sendReplyHeaders(reply,sockCli);
-
+      
+      sendReplyHeaders(reply,STDOUT_FILENO);
      
       fseek(fp,0,SEEK_SET);
       while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){

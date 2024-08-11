@@ -94,6 +94,22 @@ char* codeToMessage(enum httpStatus code){
   }
 }
 
+
+char* extensionToMimeType(char* fileExtension){
+  char* mimeType = calloc(50,1);
+  if(!strcmp(fileExtension,".html")){strcpy(mimeType,"text/html");return mimeType;}
+  if(!strcmp(fileExtension,".htm")){strcpy(mimeType,"text/html");return mimeType;}
+  if(!strcmp(fileExtension,".css")){strcpy(mimeType,"text/css");return mimeType;}
+  if(!strcmp(fileExtension,".ico")){strcpy(mimeType,"image/vnd.microsoft.icon");return mimeType;}
+  if(!strcmp(fileExtension,".svg")){strcpy(mimeType,"image/svg+xml");return mimeType;}
+  if(!strcmp(fileExtension,".png")){strcpy(mimeType,"image/png");return mimeType;}
+  if(!strcmp(fileExtension,".jpg")){strcpy(mimeType,"image/jpeg");return mimeType;}
+  //default
+  printf("NOT WORK\n");
+  strcpy(mimeType,"text/html");
+  return mimeType;
+}
+
 char* statusToErrorPage(HttpReply* reply){
   char* path = calloc(18,1);
   sprintf(path,"errorPage%d.html",reply->httpStatus);
@@ -210,6 +226,7 @@ void sendReplyHeaders(HttpReply* reply, int fd){
   write(fd, statusCode, 3);
   write(fd, " ", 1);
   char* statusMessage = codeToMessage(reply->httpStatus);
+  write(fd,statusMessage,strlen(statusMessage));
   write(fd, "\r\n", 2);
   for(int i = 0;i<reply->headerCount;i++){
     write(fd,reply->headers[i].key,strlen(reply->headers[i].key));
@@ -289,13 +306,21 @@ int addReplyHeader(HttpReply* reply, char* key, char* value){
 
 void addGeneralHeaders(HttpReply* reply){
   addReplyHeader(reply,"Server","cserver");
-  addReplyHeader(reply,"Content-type","text/html");
   addReplyHeader(reply,"Connection","Keep-Alive");
 }
 
-//void addEntityHeaders(HttpReply* reply,int contentLength){
-//  
-//}
+void addEntityHeaders(HttpReply* reply,int contentLength){
+  if(contentLength<0){
+    printf("Something Baaaaaad hapened if this prints");
+  }
+  char lengthBuffer[BUFFER_SIZE];
+  sprintf(lengthBuffer,"%d",contentLength);
+  addReplyHeader(reply,"Content-Length",lengthBuffer);
+  char* contentType = extensionToMimeType(rindex(reply->actualPath,'.'));
+  addReplyHeader(reply,"Content-Type",contentType);
+  free(contentType);
+  return;
+}
 
 enum httpStatus assignErrorStatus(enum httpStatus ret, enum httpStatus error){
   if(ret == 500)return ret;
