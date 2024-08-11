@@ -6,7 +6,7 @@ This is primarily a passion project I started to eventually self host a CV websi
 # Installation
 
 ```bash
-git clone https://github.com/mxlanDev/imageToAscii.git
+git clone https://github.com/mxlanDev/Cserver.git
 cd Cserver
 make
 cd build
