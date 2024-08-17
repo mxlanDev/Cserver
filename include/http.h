@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#define PROCESS_ERROR NULL
+#define PROCESS_ERROR 0
 #define PATH_MAX 4096
 #define BUFFER_SIZE 1024
 
@@ -16,6 +16,7 @@ enum httpMethod{
   DELETE,
   CONNECT,
   OPTIONS,
+  TRACE,
 };
 
 enum httpVersion{
@@ -121,5 +122,7 @@ void addGeneralHeaders(HttpReply* reply);
 void addEntityHeaders(HttpReply* reply, int contentLength);
 void processGet(HttpReply* reply, HttpRequest* request);
 void processHead(HttpReply* reply, HttpRequest* request);
+
+void sendPayload(int sockCli,FILE* fp,int size,enum httpMethod method);
 
 enum httpStatus assignErrorStatus(enum httpStatus ret, enum httpStatus current);

@@ -10,6 +10,7 @@ int stringToType(char* req){
   if(!strcmp(req,"DELETE"))return DELETE;
   if(!strcmp(req,"CONNECT"))return CONNECT;
   if(!strcmp(req,"OPTIONS"))return OPTIONS;
+  if(!strcmp(req,"TRACE"))return TRACE;
   return PROCESS_ERROR;
 }
 
@@ -24,6 +25,7 @@ char* typeToString(enum httpMethod type){
     case DELETE: string = "DELETE";break;
     case CONNECT: string = "CONNECT";break;
     case OPTIONS: string = "OPTIONS";break;
+    case TRACE: string = "TRACE";break;
   }
   return string;
 }

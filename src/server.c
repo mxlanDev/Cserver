@@ -3,12 +3,9 @@
 
 pthread_t threadPool[THREAD_MAX];
 //pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-//DList* queue;
 
 int main(int argc, char** argv) {
   //sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
-  //queue = dlistInit();
   int sockServ,sockCli,addrSize;
   SOCKIN hostAddr, clientAddr;
 
@@ -45,12 +42,10 @@ int main(int argc, char** argv) {
   int currentWorker = 0;
   
   while(1){
-    //printf("Waiting...");
     addrSize = sizeof(SOCKIN);
     errHandle(sockCli = accept4(sockServ,(SOCK *)&clientAddr,(socklen_t *)&addrSize,SOCK_NONBLOCK),"Connection Failed.");
     int optval = 1;
     int keepAlive = setsockopt(sockCli, SOL_SOCKET, SO_KEEPALIVE, &optval,sizeof(optval));
-    //printf("connected\n");
     event.events = EPOLLIN;
     event.data.fd = sockCli;
 
@@ -61,24 +56,6 @@ int main(int argc, char** argv) {
   }
   return 0;
 }
-/*
-void* threadLoop2(void* args){
-  Cache* threadCache = cacheInit(); 
-  while(1){
-    int* sockCli;
-    pthread_mutex_lock(&mutex);
-    if(!(sockCli = (int*)dlistPop(queue))){
-      pthread_cond_wait(&cond, &mutex);
-      sockCli = (int*)dlistPop(queue);
-    }
-
-    pthread_mutex_unlock(&mutex);
-    if(sockCli){
-      recHandle(threadCache, *sockCli);
-    }
-  }
-}
-*/
 
 void* threadLoop(void* args){
   Cache* threadCache = cacheInit();
@@ -107,7 +84,6 @@ void* recHandle(Cache* cache, int threadEpfd){
         printf("Connection closed!");
         continue;
       }
-      //printf("PULSE\n");
 
       buffer[msgSize]=0;
 
@@ -136,27 +112,26 @@ void* recHandle(Cache* cache, int threadEpfd){
       }
       fseek(fp,0,SEEK_END);
       int size = ftell(fp);
-      //char lengthBuffer[1024];
-      //sprintf(lengthBuffer,"%d",size);
-      //addReplyHeader(reply,"Content-Length",lengthBuffer);
-      //printf("%s\n",lengthBuffer);
       
       addEntityHeaders(reply,size);
 
       sendReplyHeaders(reply,sockCli);
       
-      sendReplyHeaders(reply,STDOUT_FILENO);
-     
-      fseek(fp,0,SEEK_SET);
-      while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
-        //printf("%zu bytes out\n", bytes);
-        //write(STDOUT_FILENO,buffer,bytes);
-        write(sockCli,buffer,bytes);
-       }
+      sendReplyHeaders(reply,STDOUT_FILENO);//debugging...
+
+      if(!(request->method == HEAD)){
+        fseek(fp,0,SEEK_SET);
+
+        while((bytes = fread(buffer,1,BUFFER_SIZE,fp))>0){
+          //printf("%zu bytes out\n", bytes);
+          //write(STDOUT_FILENO,buffer,bytes);
+          write(sockCli,buffer,bytes);
+        }
       
       
-      requestDelete(request);
-      replyDelete(reply);
+        requestDelete(request);
+        replyDelete(reply);
+      }
 
       //close(polledEvents[i].data.fd);
       //printf("Closing con");
