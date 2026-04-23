@@ -1,36 +1,52 @@
+
 # Cserver
 
-A web server that is written in the C language, which currently supports multithreading with epoll nonblocking I/O and a file cache on a thread-by-thread basis.<br>
-This is primarily a passion project I started to eventually self host a CV website on a physical server.<br>
+A web server written in the C language, currently supporting multithreading with epoll nonblocking I/O and a file cache on a thread-by-thread basis. This is primarily a passion project I started to eventually self-host a CV website on a physical server.
 
-# Installation
+## Features
 
+- POSIX socket-based I/O operations
+- Thread-by-thread epoll setup to manage reading from file descriptors
+- 5 worker threads executing a thread loop which receives HTTP requests and forms HTTP replies
+- Currently only supporting GET requests, which will change in the future
+- Return pages for error HTTP codes (Example: for code 400 write `errorPage400.html` to client)
+- Per-thread file cache for serving static content efficiently
+
+## Dependencies
+
+- gcc
+- make
+- POSIX-compliant OS (Linux/Unix)
+- pthreads
+
+## Installation
 ```bash
-git clone https://github.com/mxlanDev/Cserver.git
+git clone https://github.com/exaltdev/Cserver.git
 cd Cserver
 make
 cd build
-./server -Runs HTTP server on port 8080
+./server
 ```
+Runs HTTP server on port 8080.
 
-# Current Features:
+## Functionality
 
--POSIX socket-based I/O operations.<br>
--Thread by thread epoll setup to manage reading from file descriptors.<br>
--5 worker threads executing a thread loop which receives HTTP requests and forms HTTP replies.<br>
--Currently only supporting GET requests, which will change in the future.<br>
--Return pages for error HTTP codes (Example: for code 400 write errorPage400.html to client).<br>
+The server creates a listening socket on port 8080 and spawns 5 worker threads. Each thread runs its own epoll instance for nonblocking I/O. The main thread accepts incoming connections with `accept4` using `SOCK_NONBLOCK` and distributes them round-robin across the worker epoll instances.
 
-# TODO:
--Implement other request types.<br>
--Fully implement header processing instead of hardcoded magic code.<br>
--Remove magic variables entirely from the codebase.<br>
--Introduce config files for various server settings.<br>
--Implement TLS handshake and switch to TLS port.<br>
+Each worker thread runs a loop that:
 
-# Contribution
+1. Calls `epoll_wait` on its assigned file descriptors
+2. Reads the HTTP request from the client
+3. Parses the request into an `HttpRequest` struct
+4. Forms an `HttpReply` based on the requested resource
+5. Checks the per-thread file cache for the requested file
+6. Sends HTTP response headers and body
 
-I will not accept contributions (at least for now), but will periodically check the issues tab for feature requests or found bugs.
+## TODO
 
+Rewrite this project with selfwritten libraries. (This project is currently not being developed).
 
+## License
+
+See LICENSE file for details
 
